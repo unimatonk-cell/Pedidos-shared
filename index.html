@@ -50,6 +50,7 @@ header{
   padding: 28px 20px 18px 20px;
   border-bottom: 2px solid var(--ink);
   background: var(--paper);
+  position: relative;
 }
 .brand{
   display: flex;
@@ -146,6 +147,25 @@ h1{
   border-color: var(--ink);
   color: var(--paper);
 }
+.btn-export{
+  position: absolute;
+  top: 24px;
+  right: 20px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: var(--white);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.btn-export:hover{ border-color: var(--sage); color: var(--sage); }
+.btn-export:active{ transform: scale(0.94); }
 
 /* ---------- Order list ---------- */
 .list{
@@ -586,6 +606,7 @@ h1{
       </div>
     </div>
     <div class="stats" id="stats"></div>
+    <button class="btn-export" id="exportCsvBtn" type="button" title="Exportar CSV" aria-label="Exportar CSV">⬇</button>
   </header>
 
   <div class="controls">
@@ -648,7 +669,7 @@ h1{
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
-  getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot
+  getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, getDocs
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -663,6 +684,7 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const ordersCol = collection(db, 'orders');
+const archiveCol = collection(db, 'orders_archive');
 
 let orders = [];
 let currentFilter = 'all';
@@ -719,6 +741,81 @@ function fmtDate(iso){
   if(isNaN(d)) return iso;
   return d.toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: 'numeric' });
 }
+
+function csvEscape(value){
+  const s = String(value ?? '');
+  if(/[",\n]/.test(s)){
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+function itemsToText(items){
+  if(!Array.isArray(items) || items.length === 0) return '';
+  return items.map(it => `${it.name || ''} x${it.qty || 0} @ ${it.price || 0}`).join(' | ');
+}
+
+// Exports every order ever created — including ones already deleted from
+// the app — as a CSV file, so there's always a permanent record.
+async function exportOrdersToCsv(){
+  try{
+    showToast('Preparando CSV…');
+
+    const archiveSnap = await getDocs(archiveCol);
+    const archived = archiveSnap.docs.map(d => ({ id: d.id, ...d.data(), _status: 'Eliminado' }));
+
+    const activeIds = new Set(orders.map(o => o.id));
+    const activeRows = orders.map(o => ({ ...o, _status: 'Activo' }));
+    // Avoid duplicating an order that's both active and (stale) archived.
+    const archivedRows = archived.filter(o => !activeIds.has(o.id));
+
+    const all = [...activeRows, ...archivedRows]
+      .sort((a,b) => (Number(a.orderNumber)||0) - (Number(b.orderNumber)||0));
+
+    const headers = [
+      'Número de pedido', 'Cliente', 'Productos', 'Total',
+      'Cancelado', 'Fecha de pago', 'Entregado', 'Notas',
+      'Estado', 'Creado', 'Eliminado el'
+    ];
+
+    const rows = all.map(o => [
+      o.orderNumber || '',
+      o.customerName || '',
+      itemsToText(o.items),
+      orderTotal(o),
+      o.paid ? 'Sí' : 'No',
+      o.paidDate || '',
+      o.delivered ? 'Sí' : 'No',
+      o.notes || '',
+      o._status,
+      o.createdAt ? new Date(o.createdAt).toISOString().slice(0,10) : '',
+      o.deletedAt ? new Date(o.deletedAt).toISOString().slice(0,10) : ''
+    ]);
+
+    const csvLines = [headers, ...rows]
+      .map(row => row.map(csvEscape).join(','))
+      .join('\r\n');
+
+    // BOM so accented characters (ñ, á, é...) render correctly in Excel.
+    const blob = new Blob(['\ufeff' + csvLines], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `pedidos_origen_despensa_${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast(`CSV descargado (${all.length} pedidos)`);
+  }catch(err){
+    console.error('Error exportando CSV', err);
+    showToast('No se pudo exportar el CSV');
+  }
+}
+
+document.getElementById('exportCsvBtn').addEventListener('click', exportOrdersToCsv);
 
 function fmtMoney(n){
   const num = Number(n) || 0;
@@ -847,6 +944,15 @@ listEl.addEventListener('click', async (e) => {
       await updateDoc(doc(db, 'orders', id), { delivered: !order.delivered });
     } else if(action === 'delete'){
       if(confirm(`¿Eliminar el pedido de ${order.customerName}?`)){
+        try{
+          // Archive a copy before deleting, so it survives in the CSV history.
+          await setDoc(doc(db, 'orders_archive', id), {
+            ...order,
+            deletedAt: Date.now()
+          });
+        }catch(archiveErr){
+          console.error('No se pudo archivar antes de borrar', archiveErr);
+        }
         await deleteDoc(doc(db, 'orders', id));
         showToast('Pedido eliminado');
       }

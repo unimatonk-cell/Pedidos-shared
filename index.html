@@ -774,7 +774,7 @@ async function exportOrdersToCsv(){
 
     const headers = [
       'Número de pedido', 'Cliente', 'Productos', 'Total',
-      'Cancelado', 'Fecha de pago', 'Entregado', 'Notas',
+      'Cancelado', 'Fecha de pago', 'Entregado', 'Fecha de entrega', 'Notas',
       'Estado', 'Creado', 'Eliminado el'
     ];
 
@@ -786,6 +786,7 @@ async function exportOrdersToCsv(){
       o.paid ? 'Sí' : 'No',
       o.paidDate || '',
       o.delivered ? 'Sí' : 'No',
+      o.date || '',
       o.notes || '',
       o._status,
       o.createdAt ? new Date(o.createdAt).toISOString().slice(0,10) : '',
@@ -796,8 +797,13 @@ async function exportOrdersToCsv(){
       .map(row => row.map(csvEscape).join(','))
       .join('\r\n');
 
+    // "sep=," forces Excel to read this as comma-separated even on systems
+    // where the regional default is semicolon (common in Spanish locales) —
+    // without it, Excel can dump every value into a single column.
+    const csvContent = 'sep=,\r\n' + csvLines;
+
     // BOM so accented characters (ñ, á, é...) render correctly in Excel.
-    const blob = new Blob(['\ufeff' + csvLines], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const today = new Date().toISOString().slice(0,10);

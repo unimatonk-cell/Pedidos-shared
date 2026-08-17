@@ -750,6 +750,16 @@ function csvEscape(value){
   return s;
 }
 
+// Removes accents/diacritics (á→a, ñ→n, etc.) so the CSV is plain ASCII
+// and never runs into encoding-mismatch issues in any spreadsheet app.
+function stripAccents(value){
+  const s = String(value ?? '');
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip combining accent marks
+    .replace(/ñ/g, 'n').replace(/Ñ/g, 'N');
+}
+
 function itemsToText(items){
   if(!Array.isArray(items) || items.length === 0) return '';
   return items.map(it => `${it.name || ''} x${it.qty || 0} @ ${it.price || 0}`).join(' | ');
@@ -773,19 +783,20 @@ async function exportOrdersToCsv(){
       .sort((a,b) => (Number(a.orderNumber)||0) - (Number(b.orderNumber)||0));
 
     const headers = [
-      'Número de pedido', 'Cliente', 'Productos', 'Total',
-      'Cancelado', 'Fecha de pago', 'Entregado', 'Fecha de entrega', 'Notas',
+      'Numero de pedido', 'Cliente', 'Telefono', 'Productos', 'Total',
+      'Pagado', 'Fecha de pago', 'Entregado', 'Fecha de entrega', 'Notas',
       'Estado', 'Creado', 'Eliminado el'
     ];
 
     const rows = all.map(o => [
       o.orderNumber || '',
       o.customerName || '',
+      o.phone || '',
       itemsToText(o.items),
       orderTotal(o),
-      o.paid ? 'Sí' : 'No',
+      o.paid ? 'Si' : 'No',
       o.paidDate || '',
-      o.delivered ? 'Sí' : 'No',
+      o.delivered ? 'Si' : 'No',
       o.date || '',
       o.notes || '',
       o._status,
@@ -794,7 +805,7 @@ async function exportOrdersToCsv(){
     ]);
 
     const csvLines = [headers, ...rows]
-      .map(row => row.map(csvEscape).join(','))
+      .map(row => row.map(v => csvEscape(stripAccents(v))).join(','))
       .join('\r\n');
 
     // "sep=," forces Excel to read this as comma-separated even on systems
@@ -802,8 +813,8 @@ async function exportOrdersToCsv(){
     // without it, Excel can dump every value into a single column.
     const csvContent = 'sep=,\r\n' + csvLines;
 
-    // BOM so accented characters (ñ, á, é...) render correctly in Excel.
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Plain ASCII now (accents stripped), so no BOM/encoding issues to worry about.
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const today = new Date().toISOString().slice(0,10);
@@ -912,7 +923,7 @@ function render(){
       <hr class="divider">
       <div class="ticket-foot">
         <div class="chip ${o.paid ? 'on-paid' : 'off'}" data-action="paid" data-id="${o.id}">
-          ${o.paid ? '✓ Cancelado' : '○ Sin cancelar'}
+          ${o.paid ? '✓ Pagado' : '○ Sin cancelar'}
         </div>
         <div class="chip ${o.delivered ? 'on-delivered' : 'off'}" data-action="delivered" data-id="${o.id}">
           ${o.delivered ? '✓ Entregado' : '○ Sin entregar'}

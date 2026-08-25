@@ -120,6 +120,91 @@ h1{
 .search:focus{ border-color: var(--sage); }
 .search::placeholder{ color: #A5AAB0; }
 
+.sort-row{
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+  position: relative;
+}
+.sort-btn{
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 8px 13px;
+  border-radius: 20px;
+  border: 1.5px solid var(--line);
+  background: var(--white);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.sort-btn:hover{ border-color: var(--sage); color: var(--sage); }
+.sort-btn.open{
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.sort-btn .sort-icon{
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.sort-btn .sort-chevron{
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+.sort-btn.open .sort-chevron{ transform: rotate(180deg); }
+
+.sort-menu{
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: var(--white);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  z-index: 20;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.sort-menu.show{
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.sort-option{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.sort-option:hover{ background: var(--paper-dim); }
+.sort-option.active{ color: var(--sage); }
+.sort-option .check{
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--sage);
+  visibility: hidden;
+}
+.sort-option.active .check{ visibility: visible; }
+
 .tabs{
   display: flex;
   gap: 6px;
@@ -611,6 +696,23 @@ h1{
 
   <div class="controls">
     <input class="search" id="search" type="text" placeholder="Buscar por nombre o producto…">
+    <div class="sort-row">
+      <button class="sort-btn" id="sortBtn" type="button" aria-haspopup="true" aria-expanded="false">
+        <svg class="sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 19l-3.5-3.5M17 19l3.5-3.5"/></svg>
+        <span id="sortBtnLabel">Fecha de entrega</span>
+        <svg class="sort-chevron" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="sort-menu" id="sortMenu">
+        <div class="sort-option active" data-sort="date-asc">
+          <span>Fecha de entrega</span>
+          <svg class="check" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="sort-option" data-sort="num-desc">
+          <span>№ Pedido</span>
+          <svg class="check" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+    </div>
     <div class="tabs" id="tabs">
       <div class="tab active" data-filter="all">Todos</div>
       <div class="tab" data-filter="unpaid">Sin cancelar</div>
@@ -689,6 +791,7 @@ const archiveCol = collection(db, 'orders_archive');
 let orders = [];
 let currentFilter = 'all';
 let searchTerm = '';
+let currentSort = 'date-asc';
 let editingId = null;
 
 const listEl = document.getElementById('list');
@@ -875,7 +978,15 @@ function renderStats(){
 function render(){
   renderStats();
 
-  const sorted = [...orders].sort((a,b)=> (b.createdAt||0) - (a.createdAt||0));
+  const sorted = [...orders].sort((a,b) => {
+    switch(currentSort){
+      case 'num-desc':
+        return (Number(b.orderNumber)||0) - (Number(a.orderNumber)||0);
+      case 'date-asc':
+      default:
+        return (a.date||'').localeCompare(b.date||'') || (a.createdAt||0) - (b.createdAt||0);
+    }
+  });
   const visible = sorted.filter(o=> matchesFilter(o) && matchesSearch(o));
 
   if(orders.length === 0){
@@ -996,6 +1107,45 @@ document.getElementById('tabs').addEventListener('click', (e) => {
 document.getElementById('search').addEventListener('input', (e) => {
   searchTerm = e.target.value;
   render();
+});
+
+// Sort
+const sortBtn = document.getElementById('sortBtn');
+const sortMenu = document.getElementById('sortMenu');
+const sortBtnLabel = document.getElementById('sortBtnLabel');
+const sortLabels = {
+  'date-asc': 'Fecha · menor a mayor',
+  'num-desc': '№ Pedido · mayor a menor'
+};
+
+function closeSortMenu(){
+  sortMenu.classList.remove('show');
+  sortBtn.classList.remove('open');
+  sortBtn.setAttribute('aria-expanded', 'false');
+}
+
+sortBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const willOpen = !sortMenu.classList.contains('show');
+  sortMenu.classList.toggle('show', willOpen);
+  sortBtn.classList.toggle('open', willOpen);
+  sortBtn.setAttribute('aria-expanded', String(willOpen));
+});
+
+sortMenu.addEventListener('click', (e) => {
+  const opt = e.target.closest('.sort-option');
+  if(!opt) return;
+  currentSort = opt.dataset.sort;
+  sortBtnLabel.textContent = sortLabels[currentSort];
+  document.querySelectorAll('.sort-option').forEach(o => o.classList.toggle('active', o.dataset.sort === currentSort));
+  closeSortMenu();
+  render();
+});
+
+document.addEventListener('click', (e) => {
+  if(!sortMenu.contains(e.target) && e.target !== sortBtn){
+    closeSortMenu();
+  }
 });
 
 // ---------- Item rows in the add/edit form ----------

@@ -977,7 +977,7 @@ function showToast(msg){
 }
 
 // Real-time sync: fires whenever ANY device adds/edits/deletes an order.
-let migratedOnce = false;
+let assigningNumbers = false;
 let ordersLoaded = false;
 const loadTimeout = setTimeout(() => {
   if(!ordersLoaded){
@@ -995,9 +995,9 @@ onSnapshot(ordersCol, (snapshot) => {
     console.error('Error renderizando pedidos', err);
     listEl.innerHTML = `<div class="empty"><div class="big">Error mostrando los pedidos</div>Abra la consola del navegador para ver el error.</div>`;
   }
-  if(!migratedOnce){
-    migratedOnce = true;
-    assignMissingOrderNumbers().catch(err => console.error(err));
+  if(!assigningNumbers && orders.some(o => !o.orderNumber)){
+    assigningNumbers = true;
+    assignMissingOrderNumbers().catch(err => console.error(err)).finally(() => { assigningNumbers = false; });
   }
 }, (err) => {
   ordersLoaded = true;
@@ -1006,8 +1006,11 @@ onSnapshot(ordersCol, (snapshot) => {
   listEl.innerHTML = `<div class="empty"><div class="big">No se pudieron cargar los pedidos</div>Sin conexión con la base de datos compartida.</div>`;
 });
 
-// One-time migration: give any order created before this update a
-// permanent order number (oldest first), so it stays fixed from now on.
+// Gives any order with no order number yet (new ones from the online
+// store, or legacy ones from before this feature existed) a permanent
+// number, oldest first, so it stays fixed from then on. Runs every time
+// new orders come in — not just once — so live orders from the store
+// get numbered right away instead of showing as "000".
 async function assignMissingOrderNumbers(){
   const missing = orders.filter(o => !o.orderNumber);
   if(missing.length === 0) return;
@@ -1052,7 +1055,16 @@ function stripAccents(value){
 
 function itemsToText(items){
   if(!Array.isArray(items) || items.length === 0) return '';
-  return items.map(it => `${it.name || ''} x${it.qty || 0} @ ${it.price || 0}`).join(' | ');
+  return items.map(it => `${itemDisplayName(it)} x${it.qty || 0} @ ${it.price || 0}`).join(' | ');
+}
+
+// Adds the size in parentheses after the product name when the item has
+// one, e.g. "Hummus Clásico (grande)" — used anywhere an item's name is
+// shown to the user.
+function itemDisplayName(it){
+  const name = it && it.name || '';
+  const size = it && it.size ? String(it.size).trim() : '';
+  return size ? `${name} (${size})` : name;
 }
 
 // Exports every order that was ever COMPLETED (archived) — cancelled
@@ -1064,7 +1076,7 @@ async function exportOrdersToCsv(){
     const archived=archiveSnap.docs.map(d=>({id:d.id,...d.data(),_status:'Completado'}));
     const activeIds=new Set(orders.map(o=>o.id));
     const all=[...orders.map(o=>({...o,_status:'Activo'})),...archived.filter(o=>!activeIds.has(o.id))]
-      .sort((a,b)=>(Number(a.orderNumber)||0)-(Number(b.orderNumber)||0));
+      .sort((a,b)=>(Number(a.createdAt)||0)-(Number(b.createdAt)||0));
     const headers=['id_pedido','numero_pedido','nombre_cliente','telefono','producto_id','producto','tamaño','cantidad','precio_unitario','total_linea','total_pedido','pagado','metodo_pago','fecha_pago','fecha_entrega_programada','entregado','notas','estado','fecha_creacion','fecha_eliminacion'];
     const rows=[];
     for(const o of all){
@@ -1165,7 +1177,7 @@ function render(){
         <div class="items">
           ${o.items.map(it => `
             <div class="item-line">
-              <div class="iname">${escapeHtml(it.name)} ${Number(it.qty) > 1 ? `<span class="iqty">×${it.qty}</span>` : ''}</div>
+              <div class="iname">${escapeHtml(itemDisplayName(it))} ${Number(it.qty) > 1 ? `<span class="iqty">×${it.qty}</span>` : ''}</div>
               <div class="isub">${fmtMoney((Number(it.qty)||0) * (Number(it.price)||0))}</div>
             </div>
           `).join('')}

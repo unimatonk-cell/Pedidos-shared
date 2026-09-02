@@ -553,9 +553,35 @@ h1{
 .row2 .field{ flex: 1; }
 
 .items-field{ margin-bottom: 14px; }
-.item-row{ display:flex; gap:8px; align-items:flex-start; margin-bottom:8px; }
-.item-row .product-field{ flex:1 1 auto; min-width:0; }
+.item-row{
+  display:flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+.item-row-top{ display:flex; gap:8px; align-items:flex-start; }
+.item-row-top .product-field{ flex:1 1 auto; min-width:0; }
 .item-row input.iname-input{ width:100%; min-width:0; }
+.item-row-bottom{
+  display: grid;
+  grid-template-columns: 1fr 64px 1fr;
+  gap: 8px;
+}
+.item-row-bottom .field-group{ min-width: 0; }
+.field-group-label{
+  display: block;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+  font-weight: 700;
+}
 .product-suggestions{
   position:absolute;
   left:0;
@@ -587,17 +613,15 @@ h1{
 .product-no-match{padding:10px 12px;color:var(--ink-soft);font-size:12px;}
 .product-field{position:relative;}
 
-.item-row select.isize-input{ width:98px; padding:10px 8px; border-radius:8px; border:1.5px solid var(--line); background:var(--white); font-family:'Manrope',sans-serif; font-size:14px; color:var(--ink); outline:none; flex-shrink:0; }
+.item-row select.isize-input{ width:100%; padding:10px 8px; border-radius:8px; border:1.5px solid var(--line); background:var(--white); font-family:'Manrope',sans-serif; font-size:14px; color:var(--ink); outline:none; }
 .item-row select.isize-input:focus{ border-color:var(--sage); }
 .item-row select.isize-input:disabled{ color:var(--ink-soft); background:var(--paper-dim); }
 .item-row input.iqty-input{
-  width: 52px;
+  width: 100%;
   text-align: center;
-  flex-shrink: 0;
 }
 .item-row input.iprice-input{
-  width: 92px;
-  flex-shrink: 0;
+  width: 100%;
 }
 .item-row input{
   padding: 10px 10px;
@@ -1430,14 +1454,27 @@ function renderSizeOptions(row){
 }
 function renderItemRows(){
   itemRowsEl.innerHTML = formItems.map(row=>`<div class="item-row" data-row="${row.rowId}">
-    <div class="product-field">
-      <input class="iname-input" type="text" autocomplete="off" placeholder="Producto" value="${escapeAttr(row.name)}" data-field="name" aria-autocomplete="list">
-      <div class="product-suggestions" role="listbox"></div>
+    <div class="item-row-top">
+      <div class="product-field">
+        <input class="iname-input" type="text" autocomplete="off" placeholder="Producto" value="${escapeAttr(row.name)}" data-field="name" aria-autocomplete="list">
+        <div class="product-suggestions" role="listbox"></div>
+      </div>
+      <button type="button" class="item-remove" data-remove="${row.rowId}" aria-label="Quitar producto">✕</button>
     </div>
-    <select class="isize-input" data-field="size" ${(!row.productId || !productById.get(row.productId)?.sizes.length)?'disabled':''}>${renderSizeOptions(row)}</select>
-    <input class="iqty-input" type="number" min="1" step="1" value="${row.qty}" data-field="qty" aria-label="Cantidad">
-    <input class="iprice-input" type="number" min="0" step="0.01" placeholder="Precio" value="${row.price}" data-field="price" aria-label="Precio">
-    <button type="button" class="item-remove" data-remove="${row.rowId}" aria-label="Quitar producto">✕</button>
+    <div class="item-row-bottom">
+      <div class="field-group fg-size">
+        <span class="field-group-label">Tamaño</span>
+        <select class="isize-input" data-field="size" ${(!row.productId || !productById.get(row.productId)?.sizes.length)?'disabled':''}>${renderSizeOptions(row)}</select>
+      </div>
+      <div class="field-group fg-qty">
+        <span class="field-group-label">Cant.</span>
+        <input class="iqty-input" type="number" min="1" step="1" value="${row.qty}" data-field="qty" aria-label="Cantidad">
+      </div>
+      <div class="field-group fg-price">
+        <span class="field-group-label">Precio</span>
+        <input class="iprice-input" type="number" min="0" step="0.01" placeholder="0" value="${row.price}" data-field="price" aria-label="Precio">
+      </div>
+    </div>
   </div>`).join('');
   updateSheetTotal();
 }

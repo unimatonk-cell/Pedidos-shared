@@ -91,7 +91,7 @@ h1{
   padding: 6px 10px;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: var(--white);
+  background: var(--paper);
   color: var(--ink-soft);
   white-space: nowrap;
 }
@@ -112,7 +112,7 @@ h1{
   padding: 12px 14px;
   border-radius: 10px;
   border: 1.5px solid var(--line);
-  background: var(--white);
+  background: var(--paper);
   font-family: 'Manrope', sans-serif;
   font-size: 15px;
   color: var(--ink);
@@ -138,7 +138,7 @@ h1{
   padding: 8px 13px;
   border-radius: 20px;
   border: 1.5px solid var(--line);
-  background: var(--white);
+  background: var(--paper);
   color: var(--ink-soft);
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
@@ -167,7 +167,7 @@ h1{
   top: calc(100% + 8px);
   right: 0;
   min-width: 220px;
-  background: var(--white);
+  background: var(--paper);
   border: 1.5px solid var(--line);
   border-radius: 12px;
   box-shadow: var(--shadow);
@@ -222,7 +222,7 @@ h1{
   padding: 8px 12px;
   border-radius: 20px;
   border: 1.5px solid var(--line);
-  background: var(--white);
+  background: var(--paper);
   color: var(--ink-soft);
   cursor: pointer;
   white-space: nowrap;
@@ -246,7 +246,7 @@ h1{
   line-height: 1;
   border-radius: 50%;
   border: 1.5px solid var(--line);
-  background: var(--white);
+  background: var(--paper);
   color: var(--ink-soft);
   cursor: pointer;
 }
@@ -553,16 +553,43 @@ h1{
 .row2 .field{ flex: 1; }
 
 .items-field{ margin-bottom: 14px; }
-.item-row{
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 8px;
+.item-row{ display:flex; gap:8px; align-items:flex-start; margin-bottom:8px; }
+.item-row .product-field{ flex:1 1 auto; min-width:0; }
+.item-row input.iname-input{ width:100%; min-width:0; }
+.product-suggestions{
+  position:absolute;
+  left:0;
+  right:0;
+  top:calc(100% + 4px);
+  background:var(--white);
+  border:1.5px solid var(--line);
+  border-radius:10px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+  z-index:80;
+  display:none;
+  max-height:220px;
+  overflow-y:auto;
 }
-.item-row input.iname-input{
-  flex: 1;
-  min-width: 0;
+.product-suggestions.show{display:block;}
+.product-suggestion{
+  display:block;
+  width:100%;
+  border:0;
+  background:var(--white);
+  color:var(--ink);
+  text-align:left;
+  padding:10px 12px;
+  font:600 14px 'Manrope',sans-serif;
+  cursor:pointer;
 }
+.product-suggestion:hover,.product-suggestion.active{background:var(--paper-dim);}
+.product-no-match{padding:10px 12px;color:var(--ink-soft);font-size:12px;}
+.product-field{position:relative;}
+
+.item-row select.isize-input{ width:98px; padding:10px 8px; border-radius:8px; border:1.5px solid var(--line); background:var(--white); font-family:'Manrope',sans-serif; font-size:14px; color:var(--ink); outline:none; flex-shrink:0; }
+.item-row select.isize-input:focus{ border-color:var(--sage); }
+.item-row select.isize-input:disabled{ color:var(--ink-soft); background:var(--paper-dim); }
 .item-row input.iqty-input{
   width: 52px;
   text-align: center;
@@ -795,6 +822,7 @@ h1{
     <div class="items-field">
       <label>Productos *</label>
       <div id="itemRows"></div>
+      <datalist id="productCatalogList"></datalist>
       <button type="button" class="add-item-btn" id="addItemBtn">+ Agregar producto</button>
       <div class="sheet-total">
         <div class="tlabel">Total</div>
@@ -811,7 +839,7 @@ h1{
     </div>
 
     <div class="sheet-actions">
-      <button class="btn btn-ghost" id="cancelBtn">Cancelar</button>
+      <button class="btn btn-ghost" id="cancelBtn">Volver</button>
       <button class="btn btn-primary" id="saveBtn">Guardar pedido</button>
     </div>
   </div>
@@ -872,12 +900,11 @@ h1{
 
 <div class="toast" id="toast"></div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import {
-  getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, getDocs
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script>
+// Firebase se carga como scripts clásicos para evitar que un problema con módulos ES
+// deje la aplicación bloqueada antes de inicializar la base de datos.
 const firebaseConfig = {
   apiKey: "AIzaSyCyIxTK_m7ruIqlVO6HJzt9nPDjnqqbPeE",
   authDomain: "pedidos-7059a.firebaseapp.com",
@@ -887,10 +914,20 @@ const firebaseConfig = {
   appId: "1:799317396842:web:272753d2ec7b6541c76913"
 };
 
-const fbApp = initializeApp(firebaseConfig);
-const db = getFirestore(fbApp);
-const ordersCol = collection(db, 'orders');
-const archiveCol = collection(db, 'orders_archive');
+if (!window.firebase) {
+  throw new Error('Firebase no se pudo cargar. Verifique su conexión a Internet.');
+}
+const fbApp = window.firebase.initializeApp(firebaseConfig);
+const db = window.firebase.firestore(fbApp);
+const ordersCol = db.collection('orders');
+const archiveCol = db.collection('orders_archive');
+const doc = (dbRef, collectionName, id) => dbRef.collection(collectionName).doc(id);
+const collection = (dbRef, name) => dbRef.collection(name);
+const setDoc = (ref, data) => ref.set(data);
+const updateDoc = (ref, data) => ref.update(data);
+const deleteDoc = (ref) => ref.delete();
+const getDocs = (ref) => ref.get();
+const onSnapshot = (ref, success, error) => ref.onSnapshot(success, error);
 
 let orders = [];
 let currentFilter = 'all';
@@ -917,16 +954,32 @@ function showToast(msg){
 
 // Real-time sync: fires whenever ANY device adds/edits/deletes an order.
 let migratedOnce = false;
+let ordersLoaded = false;
+const loadTimeout = setTimeout(() => {
+  if(!ordersLoaded){
+    listEl.innerHTML = `<div class="empty"><div class="big">No se pudieron cargar los pedidos</div>Revise su conexión o la configuración de Firebase e intente de nuevo.</div>`;
+  }
+}, 10000);
+
 onSnapshot(ordersCol, (snapshot) => {
+  ordersLoaded = true;
+  clearTimeout(loadTimeout);
   orders = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-  render();
+  try{
+    render();
+  }catch(err){
+    console.error('Error renderizando pedidos', err);
+    listEl.innerHTML = `<div class="empty"><div class="big">Error mostrando los pedidos</div>Abra la consola del navegador para ver el error.</div>`;
+  }
   if(!migratedOnce){
     migratedOnce = true;
-    assignMissingOrderNumbers();
+    assignMissingOrderNumbers().catch(err => console.error(err));
   }
 }, (err) => {
-  console.error(err);
-  showToast('Sin conexión con la base de datos compartida');
+  ordersLoaded = true;
+  clearTimeout(loadTimeout);
+  console.error('Error de Firestore', err);
+  listEl.innerHTML = `<div class="empty"><div class="big">No se pudieron cargar los pedidos</div>Sin conexión con la base de datos compartida.</div>`;
 });
 
 // One-time migration: give any order created before this update a
@@ -983,67 +1036,26 @@ function itemsToText(items){
 async function exportOrdersToCsv(){
   try{
     showToast('Preparando CSV…');
-
-    const archiveSnap = await getDocs(archiveCol);
-    const archived = archiveSnap.docs.map(d => ({ id: d.id, ...d.data(), _status: 'Eliminado' }));
-
-    const activeIds = new Set(orders.map(o => o.id));
-    const activeRows = orders.map(o => ({ ...o, _status: 'Activo' }));
-    // Avoid duplicating an order that's both active and (stale) archived.
-    const archivedRows = archived.filter(o => !activeIds.has(o.id));
-
-    const all = [...activeRows, ...archivedRows]
-      .sort((a,b) => (Number(a.orderNumber)||0) - (Number(b.orderNumber)||0));
-
-    const headers = [
-      'Numero de pedido', 'Cliente', 'Telefono', 'Productos', 'Total',
-      'Pagado', 'Metodo de pago', 'Fecha de pago', 'Entregado', 'Fecha de entrega', 'Notas',
-      'Estado', 'Creado', 'Eliminado el'
-    ];
-
-    const rows = all.map(o => [
-      o.orderNumber || '',
-      o.customerName || '',
-      o.phone || '',
-      itemsToText(o.items),
-      orderTotal(o),
-      o.paid ? 'Si' : 'No',
-      o.paid ? (PAYMENT_LABELS[o.paymentMethod] || '') : '',
-      o.paidDate || '',
-      o.delivered ? 'Si' : 'No',
-      o.date || '',
-      o.notes || '',
-      o._status,
-      o.createdAt ? new Date(o.createdAt).toISOString().slice(0,10) : '',
-      o.deletedAt ? new Date(o.deletedAt).toISOString().slice(0,10) : ''
-    ]);
-
-    const csvLines = [headers, ...rows]
-      .map(row => row.map(v => csvEscape(stripAccents(v))).join(','))
-      .join('\r\n');
-
-    // "sep=," forces Excel to read this as comma-separated even on systems
-    // where the regional default is semicolon (common in Spanish locales) —
-    // without it, Excel can dump every value into a single column.
-    const csvContent = 'sep=,\r\n' + csvLines;
-
-    // Plain ASCII now (accents stripped), so no BOM/encoding issues to worry about.
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const today = new Date().toISOString().slice(0,10);
-    a.href = url;
-    a.download = `pedidos_origen_despensa_${today}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    showToast(`CSV descargado (${all.length} pedidos)`);
-  }catch(err){
-    console.error('Error exportando CSV', err);
-    showToast('No se pudo exportar el CSV');
-  }
+    const archiveSnap=await getDocs(archiveCol);
+    const archived=archiveSnap.docs.map(d=>({id:d.id,...d.data(),_status:'Completado'}));
+    const activeIds=new Set(orders.map(o=>o.id));
+    const all=[...orders.map(o=>({...o,_status:'Activo'})),...archived.filter(o=>!activeIds.has(o.id))]
+      .sort((a,b)=>(Number(a.orderNumber)||0)-(Number(b.orderNumber)||0));
+    const headers=['id_pedido','numero_pedido','nombre_cliente','telefono','producto_id','producto','tamaño','cantidad','precio_unitario','total_linea','total_pedido','pagado','metodo_pago','fecha_pago','fecha_entrega_programada','entregado','notas','estado','fecha_creacion','fecha_eliminacion'];
+    const rows=[];
+    for(const o of all){
+      const items=Array.isArray(o.items)&&o.items.length?o.items:[{productId:'',name:o.details||'',size:'',qty:1,price:orderTotal(o)}];
+      const total=orderTotal(o);
+      for(const it of items){
+        const qty=Number(it.qty)||0, unitPrice=Number(it.price)||0;
+        rows.push([o.id||'',o.orderNumber||'',o.customerName||'',o.phone||'',it.productId||'',it.name||'',it.size||'',qty,unitPrice,qty*unitPrice,total,o.paid?'Sí':'No',o.paid?(PAYMENT_LABELS[o.paymentMethod]||o.paymentMethod||''):'',o.paidAt?new Date(o.paidAt).toLocaleString('es-CR'):(o.paidDate||''),o.date||'',o.delivered?'Sí':'No',o.notes||'',o._status,o.createdAt?new Date(o.createdAt).toLocaleString('es-CR'):'',o.deletedAt?new Date(o.deletedAt).toLocaleString('es-CR'):'']);
+      }
+    }
+    const csv='\ufeff'+[headers,...rows].map(r=>r.map(csvEscape).join(',')).join('\r\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}), url=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=url; a.download=`pedidos_origen_despensa_${new Date().toISOString().slice(0,10)}_es.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    showToast(`CSV descargado (${rows.length} líneas de productos)`);
+  }catch(err){ console.error('Error exportando CSV',err); showToast('No se pudo exportar el CSV'); }
 }
 
 document.getElementById('exportCsvBtn').addEventListener('click', exportOrdersToCsv);
@@ -1070,7 +1082,7 @@ function matchesFilter(o){
 function matchesSearch(o){
   if(!searchTerm) return true;
   const t = searchTerm.toLowerCase();
-  const itemText = (o.items||[]).map(it=>it.name).join(' ');
+  const itemText = (o.items||[]).map(it=>`${it.name||''} ${it.size||''}`).join(' ');
   return (o.customerName||'').toLowerCase().includes(t)
     || (o.details||'').toLowerCase().includes(t)
     || itemText.toLowerCase().includes(t);
@@ -1180,6 +1192,7 @@ listEl.addEventListener('click', async (e) => {
         await updateDoc(doc(db, 'orders', id), {
           paid: false,
           paidDate: null,
+          paidAt: null,
           paymentMethod: null
         });
       } else {
@@ -1187,7 +1200,8 @@ listEl.addEventListener('click', async (e) => {
         openPaymentChoice(order);
       }
     } else if(action === 'delivered'){
-      await updateDoc(doc(db, 'orders', id), { delivered: !order.delivered });
+      const delivered=!order.delivered;
+      await updateDoc(doc(db, 'orders', id), { delivered, deliveredAt:delivered?Date.now():null });
     } else if(action === 'delete'){
       openDeleteChoice(order);
     } else if(action === 'edit'){
@@ -1224,12 +1238,9 @@ paymentOverlay.addEventListener('click', async (e) => {
   const method = btn.dataset.method;
   if(!id) return;
   try{
-    await updateDoc(doc(db, 'orders', id), {
-      paid: true,
-      paidDate: new Date().toISOString().slice(0,10),
-      paymentMethod: method
-    });
-    showToast(`Marcado como cancelado (${PAYMENT_LABELS[method]})`);
+    const paidAt=Date.now();
+    await updateDoc(doc(db, 'orders', id), { paid:true, paidDate:new Date(paidAt).toISOString().slice(0,10), paidAt, paymentMethod:method });
+    showToast(`Pago registrado (${PAYMENT_LABELS[method]})`);
   }catch(err){
     console.error(err);
     showToast('No se pudo guardar — revisa tu conexión');
@@ -1264,8 +1275,7 @@ document.getElementById('deleteCompletedBtn').addEventListener('click', async ()
   try{
     await setDoc(doc(db, 'orders_archive', id), {
       ...order,
-      deletedAt: Date.now(),
-      deleteReason: 'completado'
+      deletedAt: Date.now()
     });
     await deleteDoc(doc(db, 'orders', id));
     showToast('Pedido archivado en el historial');
@@ -1349,59 +1359,191 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// ---------- Item rows in the add/edit form ----------
+// ---------- Catálogo de productos ----------
+const PRODUCT_CATALOG = [
+  { id:'hummus_clasico', name:'Hummus Clásico', sizes:['mediano','grande'] },
+  { id:'hummus_extra_ajo', name:'Hummus Extra Ajo', sizes:['mediano','grande'] },
+  { id:'hummus_remolacha', name:'Hummus con Remolacha', sizes:['mediano','grande'] },
+  { id:'hummus_pejibaye', name:'Hummus con Pejibaye', sizes:['mediano','grande'] },
+  { id:'hummus_chile_morron', name:'Hummus con Chile Morrón', sizes:['mediano','grande'] },
+  { id:'hummus_jalapeno_culantro', name:'Hummus con Jalapeño y Culantro', sizes:['mediano','grande'] },
+  { id:'aderezo_maracuya', name:'Aderezo de Maracuyá', sizes:['mediano','grande'] },
+  { id:'aderezo_miso', name:'Aderezo de Miso', sizes:['mediano','grande'] },
+  { id:'vinagreta_naranja_mostaza_dijon', name:'Vinagreta de Naranja con Mostaza Dijon', sizes:['mediana','grande'] },
+  { id:'vinagreta_mostaza_culantro', name:'Vinagreta de Mostaza y Culantro', sizes:['mediana','grande'] },
+  { id:'chimichurri_clasico', name:'Chimichurri Clásico', sizes:['mediano','grande'] },
+  { id:'chimichurri_picante', name:'Chimichurri Picante', sizes:['mediano','grande'] },
+  { id:'cebollitas_agridulces', name:'Cebollitas Agridulces', sizes:[] },
+  { id:'cebollitas_agridulces_jalapenos', name:'Cebollitas Agridulces con Jalapeños', sizes:[] },
+  { id:'pepinillos_agridulces_bastones', name:'Pepinillos Agridulces en Bastones', sizes:[] },
+  { id:'pepinillos_agridulces_rodajas', name:'Pepinillos Agridulces en Rodajas', sizes:[] },
+  { id:'chutney_tomate_manzana_verde', name:'Chutney de Tomate y Manzana Verde', sizes:['pequeño','mediano'] },
+  { id:'chutney_mango_pasas', name:'Chutney de Mango y Pasas', sizes:['pequeño','mediano'] },
+  { id:'tomatitos_ajos_confitados', name:'Tomatitos y Ajos Confitados', sizes:[] }
+];
+
+const PRODUCT_PRICES = {
+  hummus: { mediano: 3500, grande: 5750 },
+  aderezos_vinagretas: { mediano: 2750, mediana: 2750, grande: 4500 },
+  chimichurri: { mediano: 3500, grande: 5500 },
+  cebollitas_agridulces: { unico: 6000 },
+  pepinillos_agridulces: { unico: 3500 },
+  chutney: { pequeno: 3000, pequeño: 3000, mediano: 4000 },
+  tomatitos_ajos_confitados: { unico: 4000 }
+};
+function getDefaultPrice(product, size){
+  if(!product) return '';
+  const id=product.id;
+  if(id.startsWith('hummus_')) return PRODUCT_PRICES.hummus[size] ?? '';
+  if(id.startsWith('aderezo_') || id.startsWith('vinagreta_')) return PRODUCT_PRICES.aderezos_vinagretas[size] ?? '';
+  if(id.startsWith('chimichurri_')) return PRODUCT_PRICES.chimichurri[size] ?? '';
+  if(id.startsWith('cebollitas_')) return PRODUCT_PRICES.cebollitas_agridulces.unico;
+  if(id.startsWith('pepinillos_')) return PRODUCT_PRICES.pepinillos_agridulces.unico;
+  if(id.startsWith('chutney_')) return PRODUCT_PRICES.chutney[size] ?? '';
+  if(id === 'tomatitos_ajos_confitados') return PRODUCT_PRICES.tomatitos_ajos_confitados.unico;
+  return '';
+}
+const productById = new Map(PRODUCT_CATALOG.map(p => [p.id, p]));
+const productByName = new Map(PRODUCT_CATALOG.map(p => [normalizeProductName(p.name), p]));
+function normalizeProductName(value){
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+}
+function getProduct(value){
+  return productById.get(value) || productByName.get(normalizeProductName(value)) || null;
+}
+const productDatalist = document.getElementById('productCatalogList');
+if(productDatalist){ productDatalist.remove(); }
+
+// ---------- Filas de productos ----------
 let formItems = [];
 const itemRowsEl = document.getElementById('itemRows');
 const sheetTotalEl = document.getElementById('sheetTotal');
 
-function newItemRow(name='', qty=1, price=''){
-  return { rowId: 'r_' + Math.random().toString(36).slice(2,9), name, qty, price };
+function newItemRow(productId='', name='', size='', qty=1, price=''){
+  const product = getProduct(productId) || getProduct(name);
+  return { rowId:'r_'+Math.random().toString(36).slice(2,9), productId:product?.id||'', name:product?.name||name, size:size||'', qty, price };
 }
-
+function renderSizeOptions(row){
+  const product = productById.get(row.productId);
+  if(!product || product.sizes.length===0) return `<option value="">${product ? 'No aplica' : 'Tamaño'}</option>`;
+  return ['<option value="">Tamaño</option>', ...product.sizes.map(x=>`<option value="${escapeAttr(x)}" ${row.size===x?'selected':''}>${escapeHtml(x)}</option>`)].join('');
+}
 function renderItemRows(){
-  itemRowsEl.innerHTML = formItems.map(row => `
-    <div class="item-row" data-row="${row.rowId}">
-      <input class="iname-input" type="text" placeholder="Producto" value="${escapeAttr(row.name)}" data-field="name">
-      <input class="iqty-input" type="number" min="1" step="1" value="${row.qty}" data-field="qty">
-      <input class="iprice-input" type="number" min="0" step="0.01" placeholder="Precio" value="${row.price}" data-field="price">
-      <button type="button" class="item-remove" data-remove="${row.rowId}" aria-label="Quitar producto">✕</button>
+  itemRowsEl.innerHTML = formItems.map(row=>`<div class="item-row" data-row="${row.rowId}">
+    <div class="product-field">
+      <input class="iname-input" type="text" autocomplete="off" placeholder="Producto" value="${escapeAttr(row.name)}" data-field="name" aria-autocomplete="list">
+      <div class="product-suggestions" role="listbox"></div>
     </div>
-  `).join('');
+    <select class="isize-input" data-field="size" ${(!row.productId || !productById.get(row.productId)?.sizes.length)?'disabled':''}>${renderSizeOptions(row)}</select>
+    <input class="iqty-input" type="number" min="1" step="1" value="${row.qty}" data-field="qty" aria-label="Cantidad">
+    <input class="iprice-input" type="number" min="0" step="0.01" placeholder="Precio" value="${row.price}" data-field="price" aria-label="Precio">
+    <button type="button" class="item-remove" data-remove="${row.rowId}" aria-label="Quitar producto">✕</button>
+  </div>`).join('');
   updateSheetTotal();
 }
-
-function escapeAttr(s){
-  return (s||'').replace(/"/g,'&quot;');
-}
-
+function escapeHtml(s){ return String(s??'').replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])); }
+function escapeAttr(s){ return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function updateSheetTotal(){
-  const total = formItems.reduce((sum, r) => sum + (Number(r.qty)||0) * (Number(r.price)||0), 0);
-  sheetTotalEl.textContent = fmtMoney(total);
+  const total=formItems.reduce((sum,r)=>sum+(Number(r.qty)||0)*(Number(r.price)||0),0); sheetTotalEl.textContent=fmtMoney(total);
 }
-
-itemRowsEl.addEventListener('input', (e) => {
-  const rowEl = e.target.closest('.item-row');
-  if(!rowEl) return;
-  const rowId = rowEl.dataset.row;
-  const row = formItems.find(r => r.rowId === rowId);
-  if(!row) return;
-  const field = e.target.dataset.field;
-  row[field] = field === 'name' ? e.target.value : e.target.value;
+function setProductFromCatalog(rowEl, row, product, close=true){
+  row.productId = product.id;
+  row.name = product.name;
+  if(!product.sizes.includes(row.size)) row.size='';
+  const input=rowEl.querySelector('.iname-input');
+  const select=rowEl.querySelector('.isize-input');
+  const priceInput=rowEl.querySelector('.iprice-input');
+  if(input) input.value=product.name;
+  if(select){ select.innerHTML=renderSizeOptions(row); select.disabled=!product.sizes.length; }
+  const defaultPrice=getDefaultPrice(product,row.size);
+  if(defaultPrice !== ''){ row.price=defaultPrice; if(priceInput) priceInput.value=defaultPrice; }
+  else { row.price=''; if(priceInput) priceInput.value=''; }
+  const box=rowEl.querySelector('.product-suggestions');
+  if(box && close){ box.classList.remove('show'); box.innerHTML=''; }
+  updateSheetTotal();
+}
+function filterProducts(query){
+  const q=normalizeProductName(query);
+  if(!q) return PRODUCT_CATALOG.slice();
+  const terms=q.split(' ').filter(Boolean);
+  return PRODUCT_CATALOG.filter(p=>{
+    const name=normalizeProductName(p.name);
+    return terms.every(term=>name.includes(term));
+  });
+}
+function renderProductSuggestions(rowEl, query){
+  const box=rowEl.querySelector('.product-suggestions');
+  if(!box) return;
+  const text=String(query||'').trim();
+  if(!text){ box.classList.remove('show'); box.innerHTML=''; return; }
+  const matches=filterProducts(text);
+  box.innerHTML = matches.length
+    ? matches.map(p=>`<button type="button" class="product-suggestion" data-product-id="${escapeAttr(p.id)}" role="option">${escapeHtml(p.name)}</button>`).join('')
+    : '<div class="product-no-match">No hay productos que coincidan</div>';
+  box.classList.add('show');
+}
+function clearInvalidProduct(rowEl,row){
+  row.productId=''; row.name=''; row.size='';
+  const select=rowEl.querySelector('.isize-input');
+  if(select){ select.innerHTML='<option value="">Tamaño</option>'; select.disabled=true; }
+}
+itemRowsEl.addEventListener('input', e=>{
+  const rowEl=e.target.closest('.item-row'); if(!rowEl) return;
+  const row=formItems.find(r=>r.rowId===rowEl.dataset.row); if(!row) return;
+  if(e.target.dataset.field==='name'){
+    const typed=e.target.value;
+    // Escribir no selecciona el producto del catálogo automáticamente. Solo
+    // un clic en una sugerencia válida convierte la línea en un producto del
+    // catálogo (con precio por defecto, tamaños, etc). Pero el texto escrito
+    // SÍ se guarda como nombre de producto "de una vez" / personalizado,
+    // para poder registrar productos que no están en el catálogo.
+    clearInvalidProduct(rowEl,row);
+    row.name = typed;
+    renderProductSuggestions(rowEl,typed);
+  } else {
+    row[e.target.dataset.field]=e.target.value;
+    updateSheetTotal();
+  }
+});
+itemRowsEl.addEventListener('change', e=>{
+  const rowEl=e.target.closest('.item-row'); if(!rowEl) return;
+  const row=formItems.find(r=>r.rowId===rowEl.dataset.row); if(!row) return;
+  const field=e.target.dataset.field;
+  if(field==='size'){
+    row.size=e.target.value;
+    const product=productById.get(row.productId);
+    const defaultPrice=getDefaultPrice(product,row.size);
+    const priceInput=rowEl.querySelector('.iprice-input');
+    if(defaultPrice !== ''){ row.price=defaultPrice; if(priceInput) priceInput.value=defaultPrice; }
+    else if(product && product.sizes.length){ row.price=''; if(priceInput) priceInput.value=''; }
+  } else row[field]=e.target.value;
   updateSheetTotal();
 });
-
-itemRowsEl.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-remove]');
-  if(!btn) return;
-  formItems = formItems.filter(r => r.rowId !== btn.dataset.remove);
-  if(formItems.length === 0) formItems.push(newItemRow());
+itemRowsEl.addEventListener('focusin', e=>{
+  if(e.target.matches('.iname-input')) renderProductSuggestions(e.target.closest('.item-row'),e.target.value);
+});
+itemRowsEl.addEventListener('click', e=>{
+  const suggestion=e.target.closest('.product-suggestion');
+  if(suggestion){
+    const rowEl=suggestion.closest('.item-row');
+    const row=formItems.find(r=>r.rowId===rowEl?.dataset.row);
+    const product=productById.get(suggestion.dataset.productId);
+    if(row && product) setProductFromCatalog(rowEl,row,product,true);
+    return;
+  }
+  const b=e.target.closest('[data-remove]');
+  if(!b) return;
+  formItems=formItems.filter(r=>r.rowId!==b.dataset.remove);
+  if(!formItems.length) formItems.push(newItemRow());
   renderItemRows();
 });
-
-document.getElementById('addItemBtn').addEventListener('click', () => {
-  formItems.push(newItemRow());
-  renderItemRows();
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.product-field')){
+    document.querySelectorAll('.product-suggestions.show').forEach(box=>box.classList.remove('show'));
+  }
 });
+
+document.getElementById('addItemBtn').addEventListener('click',()=>{ formItems.push(newItemRow()); renderItemRows(); });
 
 // Add / Edit sheet
 function openSheet(order){
@@ -1413,11 +1555,11 @@ function openSheet(order){
   document.getElementById('fDate').value = order ? order.date : new Date().toISOString().slice(0,10);
 
   if(order && order.items && order.items.length){
-    formItems = order.items.map(it => newItemRow(it.name, it.qty, it.price));
+    formItems = (order.items||[]).map(it => newItemRow(it.productId||'', it.name||'', it.size||'', it.qty, it.price));
   } else if(order && order.details){
     // migrate a legacy free-text order into a single product row
     const legacyPrice = parseFloat(String(order.price||'').replace(/[^\d.-]/g,''));
-    formItems = [newItemRow(order.details, 1, isNaN(legacyPrice) ? '' : legacyPrice)];
+    formItems = [newItemRow('', order.details||'', '', 1, isNaN(legacyPrice) ? '' : legacyPrice)];
   } else {
     formItems = [newItemRow()];
   }
@@ -1435,12 +1577,17 @@ overlay.addEventListener('click', (e) => { if(e.target === overlay) closeSheet()
 
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const name = document.getElementById('fName').value.trim();
+  // Una línea es válida si es un producto del catálogo, o si es un producto
+  // "de una vez" (nombre escrito a mano, sin productId). Solo se rechazan
+  // las líneas que quedaron completamente vacías.
   const cleanItems = formItems
-    .filter(r => r.name && r.name.trim())
-    .map(r => ({ name: r.name.trim(), qty: Number(r.qty) || 1, price: Number(r.price) || 0 }));
+    .filter(r => (r.productId && productById.has(r.productId)) || String(r.name||'').trim())
+    .map(r => (r.productId && productById.has(r.productId))
+      ? { productId:r.productId, name:productById.get(r.productId).name, size:r.size||'', qty:Number(r.qty)||1, price:Number(r.price)||0 }
+      : { productId:'', name:String(r.name||'').trim(), size:r.size||'', qty:Number(r.qty)||1, price:Number(r.price)||0 });
 
-  if(!name || cleanItems.length === 0){
-    showToast('Agrega el nombre del cliente y al menos un producto');
+  if(!name || cleanItems.length === 0 || cleanItems.length !== formItems.length){
+    showToast('Escribe un nombre de producto en cada línea');
     return;
   }
   const data = {
@@ -1464,6 +1611,8 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
         paid: false,
         delivered: false,
         paidDate: null,
+        paidAt: null,
+        deliveredAt: null,
         paymentMethod: null,
         ...data
       });

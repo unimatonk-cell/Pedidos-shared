@@ -1413,8 +1413,10 @@ const PRODUCT_CATALOG = [
   { id:'cebollitas_agridulces_jalapenos', name:'Cebollitas Agridulces con Jalapeños', sizes:[] },
   { id:'pepinillos_agridulces_bastones', name:'Pepinillos Agridulces en Bastones', sizes:[] },
   { id:'pepinillos_agridulces_rodajas', name:'Pepinillos Agridulces en Rodajas', sizes:[] },
+  { id:'caja3_encurtidos', name:'Caja de 3: Encurtidos', sizes:[] },
   { id:'chutney_tomate_manzana_verde', name:'Chutney de Tomate y Manzana Verde', sizes:['pequeño','mediano'] },
   { id:'chutney_mango_pasas', name:'Chutney de Mango y Pasas', sizes:['pequeño','mediano'] },
+  { id:'caja3_chutney', name:'Caja de 3: Chutney', sizes:[] },
   { id:'tomatitos_ajos_confitados', name:'Tomatitos y Ajos Confitados', sizes:[] },
   { id:'queque_clasico', name:'Queque Clásico', sizes:['pequeño','grande'] },
   { id:'queque_nueces', name:'Queque con Nueces', sizes:['pequeño','grande'] },
@@ -1429,6 +1431,8 @@ const PRODUCT_PRICES = {
   pepinillos_agridulces: { unico: 4000 },
   chutney: { pequeno: 3500, pequeño: 3500, mediano: 4500 },
   tomatitos_ajos_confitados: { unico: 4000 },
+  caja3_encurtidos: { unico: 9500 },
+  caja3_chutney: { unico: 9500 },
   queque_clasico: { pequeño: 2000, grande: 4000 },
   queque_nueces: { pequeño: 2750, grande: 5500 },
   queque_chocolate: { pequeño: 2750, grande: 5500 }
@@ -1443,6 +1447,8 @@ function getDefaultPrice(product, size){
   if(id.startsWith('pepinillos_')) return PRODUCT_PRICES.pepinillos_agridulces.unico;
   if(id.startsWith('chutney_')) return PRODUCT_PRICES.chutney[size] ?? '';
   if(id === 'tomatitos_ajos_confitados') return PRODUCT_PRICES.tomatitos_ajos_confitados.unico;
+  if(id === 'caja3_encurtidos') return PRODUCT_PRICES.caja3_encurtidos.unico;
+  if(id === 'caja3_chutney') return PRODUCT_PRICES.caja3_chutney.unico;
   if(id.startsWith('queque_')) return PRODUCT_PRICES[id]?.[size] ?? '';
   return '';
 }

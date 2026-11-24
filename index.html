@@ -1450,7 +1450,8 @@ const PRODUCT_CATALOG = [
   { id:'queque_clasico', name:'Queque Clásico', sizes:['pequeño','grande'] },
   { id:'queque_nueces', name:'Queque con Nueces', sizes:['pequeño','grande'] },
   { id:'queque_chocolate', name:'Queque con Chocolate', sizes:['pequeño','grande'] },
-  { id:'salsa_navidena', name:'Salsa Navideña de Piña y Ciruela', sizes:[] }
+  { id:'salsa_navidena', name:'Salsa Navideña de Piña y Ciruela', sizes:[] },
+  { id:'muhammara', name:'Muhammara', sizes:[] }
 ];
 
 const PRODUCT_PRICES = {
@@ -1466,7 +1467,8 @@ const PRODUCT_PRICES = {
   queque_clasico: { pequeño: 2000, grande: 4000 },
   queque_nueces: { pequeño: 2750, grande: 5500 },
   queque_chocolate: { pequeño: 2750, grande: 5500 },
-  salsa_navidena: { unico: 6000 }
+  salsa_navidena: { unico: 6000 },
+  muhammara: { unico: 6000 }
 };
 function getDefaultPrice(product, size){
   if(!product) return '';
@@ -1482,6 +1484,7 @@ function getDefaultPrice(product, size){
   if(id === 'caja3_chutney') return PRODUCT_PRICES.caja3_chutney.unico;
   if(id.startsWith('queque_')) return PRODUCT_PRICES[id]?.[size] ?? '';
   if(id === 'salsa_navidena') return PRODUCT_PRICES.salsa_navidena.unico;
+  if(id === 'muhammara') return PRODUCT_PRICES.muhammara.unico;
   return '';
 }
 const productById = new Map(PRODUCT_CATALOG.map(p => [p.id, p]));

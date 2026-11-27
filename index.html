@@ -99,10 +99,17 @@ h1{
 .stat.warn{ background: var(--brick-light); border-color: #E3C4B8; color: var(--brick); }
 .stat.warn b{ color: var(--brick); }
 
-/* ---------- NEW: Paid total summary ---------- */
+/* ---------- Compact sticky summary and controls ---------- */
+.sticky-toolbar{
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: var(--paper);
+  padding: 8px 0 0;
+}
 .money-summary{
-  margin: 12px 20px 0 20px;
-  padding: 10px 14px;
+  margin: 0 20px;
+  padding: 9px 14px;
   border: 1.5px solid #C6D8C8;
   background: var(--sage-light);
   border-radius: 10px;
@@ -127,23 +134,10 @@ h1{
   white-space: nowrap;
 }
 
-@media (max-width: 480px){
-  .money-summary{
-    margin: 10px 12px 0 12px;
-    padding: 8px 11px;
-    gap: 8px;
-  }
-  .money-summary .mlabel{ font-size: 9px; }
-  .money-summary .mvalue{ font-size: 18px; }
-}
-
 /* ---------- Controls ---------- */
 .controls{
-  padding: 16px 20px 0 20px;
-  position: sticky;
-  top: 0;
+  padding: 3px 20px 0 20px;
   background: var(--paper);
-  z-index: 5;
 }
 .search{
   width: 100%;
@@ -162,7 +156,7 @@ h1{
 .sort-row{
   display: flex;
   justify-content: flex-end;
-  margin-top: 10px;
+  margin-top: 3px;
   position: relative;
 }
 .sort-btn{
@@ -821,6 +815,16 @@ h1{
   font-family: 'Space Mono', monospace;
   font-size: 13px;
 }
+
+@media (max-width: 480px){
+  .sticky-toolbar{ padding-top: 5px; }
+  .money-summary{ margin: 0 12px; padding: 7px 10px; }
+  .money-summary .mlabel{ font-size: 9px; }
+  .money-summary .mvalue{ font-size: 18px; }
+  .controls{ padding: 2px 12px 0; }
+  .sort-row{ margin-top: 2px; }
+  .tabs{ margin-top: 3px; }
+}
 </style>
 <meta name="theme-color" content="#46644F">
 </head>
@@ -839,7 +843,8 @@ h1{
     <button class="btn-export" id="exportCsvBtn" type="button" title="Exportar CSV" aria-label="Exportar CSV">⬇</button>
   </header>
 
-  <!-- NEW: total of active orders that are paid (cancelado) -->
+  <div class="sticky-toolbar">
+  <!-- Total cancelado -->
   <div class="money-summary">
     <div>
       <div class="mlabel">Total cancelado</div>
@@ -848,7 +853,6 @@ h1{
   </div>
 
   <div class="controls">
-    <input class="search" id="search" type="text" placeholder="Buscar por nombre o producto…">
     <div class="sort-row">
       <button class="sort-btn" id="sortBtn" type="button" aria-haspopup="true" aria-expanded="false">
         <svg class="sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 19l-3.5-3.5M17 19l3.5-3.5"/></svg>
@@ -872,6 +876,7 @@ h1{
       <div class="tab" data-filter="undelivered">Sin entregar</div>
       <div class="tab" data-filter="done">Completados</div>
     </div>
+  </div>
   </div>
 
   <div class="list" id="list">
@@ -1012,7 +1017,6 @@ const onSnapshot = (ref, success, error) => ref.onSnapshot(success, error);
 
 let orders = [];
 let currentFilter = 'all';
-let searchTerm = '';
 let currentSort = 'date-asc';
 let editingId = null;
 
@@ -1178,14 +1182,7 @@ function matchesFilter(o){
   if(currentFilter === 'done') return o.paid && o.delivered;
   return true;
 }
-function matchesSearch(o){
-  if(!searchTerm) return true;
-  const t = searchTerm.toLowerCase();
-  const itemText = (o.items||[]).map(it=>`${it.name||''} ${it.size||''}`).join(' ');
-  return (o.customerName||'').toLowerCase().includes(t)
-    || (o.details||'').toLowerCase().includes(t)
-    || itemText.toLowerCase().includes(t);
-}
+
 
 // NEW: also computes the total of ACTIVE orders that are paid ("cancelado")
 function renderStats(){
@@ -1215,14 +1212,14 @@ function render(){
         return (a.date||'').localeCompare(b.date||'') || (a.createdAt||0) - (b.createdAt||0);
     }
   });
-  const visible = sorted.filter(o=> matchesFilter(o) && matchesSearch(o));
+  const visible = sorted.filter(o=> matchesFilter(o));
 
   if(orders.length === 0){
     listEl.innerHTML = `<div class="empty"><div class="big">No hay pedidos, estamos repobres</div>Dele al botón + para registrar el primer pedido.</div>`;
     return;
   }
   if(visible.length === 0){
-    listEl.innerHTML = `<div class="empty"><div class="big">Nada por acá</div>Pruebe con otro filtro o búsqueda.</div>`;
+    listEl.innerHTML = `<div class="empty"><div class="big">Nada por acá</div>Pruebe con otro filtro.</div>`;
     return;
   }
 
@@ -1431,11 +1428,6 @@ document.getElementById('tabs').addEventListener('click', (e) => {
   render();
 });
 
-// Search
-document.getElementById('search').addEventListener('input', (e) => {
-  searchTerm = e.target.value;
-  render();
-});
 
 // Sort
 const sortBtn = document.getElementById('sortBtn');

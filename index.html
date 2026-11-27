@@ -99,6 +99,44 @@ h1{
 .stat.warn{ background: var(--brick-light); border-color: #E3C4B8; color: var(--brick); }
 .stat.warn b{ color: var(--brick); }
 
+/* ---------- NEW: Paid total summary ---------- */
+.money-summary{
+  margin: 12px 20px 0 20px;
+  padding: 10px 14px;
+  border: 1.5px solid #C6D8C8;
+  background: var(--sage-light);
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.money-summary .mlabel{
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--sage);
+}
+.money-summary .mvalue{
+  font-family: 'Space Mono', monospace;
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--sage);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px){
+  .money-summary{
+    margin: 10px 12px 0 12px;
+    padding: 8px 11px;
+    gap: 8px;
+  }
+  .money-summary .mlabel{ font-size: 9px; }
+  .money-summary .mvalue{ font-size: 18px; }
+}
+
 /* ---------- Controls ---------- */
 .controls{
   padding: 16px 20px 0 20px;
@@ -801,6 +839,14 @@ h1{
     <button class="btn-export" id="exportCsvBtn" type="button" title="Exportar CSV" aria-label="Exportar CSV">⬇</button>
   </header>
 
+  <!-- NEW: total of active orders that are paid (cancelado) -->
+  <div class="money-summary">
+    <div>
+      <div class="mlabel">Total cancelado</div>
+    </div>
+    <div class="mvalue" id="paidTotal">₡0</div>
+  </div>
+
   <div class="controls">
     <input class="search" id="search" type="text" placeholder="Buscar por nombre o producto…">
     <div class="sort-row">
@@ -1141,6 +1187,7 @@ function matchesSearch(o){
     || itemText.toLowerCase().includes(t);
 }
 
+// NEW: also computes the total of ACTIVE orders that are paid ("cancelado")
 function renderStats(){
   const unpaid = orders.filter(o=>!o.paid).length;
   const undelivered = orders.filter(o=>!o.delivered).length;
@@ -1149,6 +1196,11 @@ function renderStats(){
     <div class="stat ${unpaid? 'warn':''}"><b>${unpaid}</b> sin cancelar</div>
     <div class="stat ${undelivered? 'warn':''}"><b>${undelivered}</b> por entregar</div>
   `;
+
+  // Sum of all ACTIVE orders that are paid ("cancelado")
+  const paidOrders = orders.filter(o => o.paid);
+  const paidTotal = paidOrders.reduce((sum, o) => sum + orderTotal(o), 0);
+  document.getElementById('paidTotal').textContent = fmtMoney(paidTotal);
 }
 
 function render(){

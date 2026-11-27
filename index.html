@@ -975,6 +975,7 @@ h1{
         <div id="sinpeTypeOptions" class="sinpe-dropdown" hidden aria-label="Cuenta de SINPE Móvil">
           <button type="button" class="sinpe-dropdown-option" data-sinpe-type="ACH">ACH</button>
           <button type="button" class="sinpe-dropdown-option" data-sinpe-type="GAS">GAS</button>
+          <button type="button" class="sinpe-dropdown-option" data-sinpe-type="RCB">RCB</button>
         </div>
       </div>
     </div>
@@ -1341,7 +1342,7 @@ paymentOverlay.addEventListener('click', async (e) => {
   const id = pendingPaymentId;
   if(!id) return;
 
-  // SINPE Móvil requiere escoger primero el subtipo ACH o GAS.
+  // SINPE Móvil requiere escoger primero el subtipo ACH, GAS o RCB.
   if(methodBtn && methodBtn.dataset.method === 'sinpe') {
     document.getElementById('sinpeTypeOptions').hidden = false;
     document.getElementById('paymentSub').textContent = 'Selecciona la cuenta de SINPE';
